@@ -26,6 +26,7 @@ async function main () {
   } else {
     throw new Error('Only support testnet.')
   }
+  
   let cmd = process.argv[2]
 
   if (fs.existsSync('pending-txs.json')) {
