@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 const dogecore = require('bitcore-lib-doge')
 const axios = require('axios')
 const fs = require('fs')
@@ -9,10 +7,14 @@ const express = require('express')
 const { PrivateKey, Address, Transaction, Script, Opcode } = dogecore
 const { Hash, Signature } = dogecore.crypto
 
+const API_URL = 'https://dogetest-explorer.dogelayer.org/api/v2/'
+
 dotenv.config()
 
 if (process.env.TESTNET == 'true') {
   dogecore.Networks.defaultNetwork = dogecore.Networks.testnet
+} else {
+    throw new Error("Only support testnet now.")
 }
 
 if (process.env.FEE_PER_KB) {
@@ -514,7 +516,7 @@ function updateWallet (wallet, tx) {
 }
 
 async function broadcast_dogelayer_api(tx) {
-  const API_URL = 'https://dogetest-explorer.dogelayer.org/api/v2/'
+  
   try {
     const response = await axios.post(API_URL + 'sendtx/', tx.toString())
     console.log(response.data)
