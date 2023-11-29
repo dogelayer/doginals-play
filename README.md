@@ -4,7 +4,8 @@ A minter and protocol for inscriptions on Dogecoin.
 
 ## ⚠️⚠️⚠️ Important ⚠️⚠️⚠️
 
-Use this wallet for inscribing only! Always inscribe from this wallet to a different address, e.g. one you created with Woof Wallet. This wallet is not meant for storing funds or inscriptions.
+Use this wallet for inscribing only! Always inscribe from this wallet to a different address.   
+This wallet is not meant for storing funds or inscriptions.
 
 ## Prerequisites
 
@@ -17,8 +18,6 @@ Please head over to [https://nodejs.org/en/download](https://nodejs.org/en/downl
 ## Setup
 
 ### install
-
-####
 
 ```
 cd <path to your download / installation>
@@ -92,12 +91,17 @@ node . mint DSV12KPb8m5b6YtfmqY89K6YqvdVwMYDPn "text/plain;charset=utf-8" 576f6f
 
 ## DRC-20
 
+
 ```
+node . drc-20 deploy <address> <ticker> <max> <limit>
 node . drc-20 mint <address> <ticker> <amount>
 ```
 
 Examples: 
 
+```
+node . drc-20 deploy nULJk6t218u2W1FoXPBf21SEuSudfNodiK mgt 100000000 1000
+```
 ```
 node . drc-20 mint DSV12KPb8m5b6YtfmqY89K6YqvdVwMYDPn dogi 1000
 ```

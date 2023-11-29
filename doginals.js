@@ -526,21 +526,23 @@ function chunkToNumber (chunk) {
   return undefined
 }
 
-async function getAddressTxs(address) {
-    let {data} = await axios.get(API_URL + "/address/" + address + "?details=txs")
-    txs = data.transactions
-    return txs
+async function getAddressTxs (address) {
+  let { data } = await axios.get(
+    API_URL + '/address/' + address + '?details=txs'
+  )
+  txs = data.transactions
+  return txs
 }
 
-function findSpendTx(txs,txid,n) {
-    for (tx of txs) {
-        for(vin of tx.vin) {
-            if(vin.txid == txid && vin.n == n) {
-                return tx.txid
-            }
-        }
+function findSpendTx (txs, txid, n) {
+  for (tx of txs) {
+    for (vin of tx.vin) {
+      if (vin.txid == txid && vin.n == n) {
+        return tx.txid
+      }
     }
-    return null
+  }
+  return null
 }
 
 async function extract (txid) {
@@ -567,8 +569,8 @@ async function extract (txid) {
 
     if (n !== remaining - 1) {
       const txs = await getAddressTxs(transaction.vout[0].addresses[0])
-      txid = findSpendTx(txs,transaction.txid,0)
-      console.log("next tx: ", txid)
+      txid = findSpendTx(txs, transaction.txid, 0)
+      console.log('next tx: ', txid)
       resp = await axios.get(API_URL + 'tx/' + txid)
       transaction = resp.data
       script = Script.fromHex(transaction.vin[0].hex)
