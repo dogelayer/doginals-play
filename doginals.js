@@ -8,14 +8,9 @@ const { PrivateKey, Address, Transaction, Script, Opcode } = dogecore
 const { Hash, Signature } = dogecore.crypto
 
 const API_URL = 'https://dogetest-explorer.dogelayer.org/api/v2/'
+const MAX_SCRIPT_ELEMENT_SIZE = 520
 
 dotenv.config()
-
-if (process.env.TESTNET == 'true') {
-  dogecore.Networks.defaultNetwork = dogecore.Networks.testnet
-} else {
-    throw new Error("Only support testnet now.")
-}
 
 if (process.env.FEE_PER_KB) {
   Transaction.FEE_PER_KB = parseInt(process.env.FEE_PER_KB)
@@ -26,6 +21,11 @@ if (process.env.FEE_PER_KB) {
 const WALLET_PATH = process.env.WALLET || '.wallet.json'
 
 async function main () {
+  if (process.env.TESTNET == 'true') {
+    dogecore.Networks.defaultNetwork = dogecore.Networks.testnet
+  } else {
+    throw new Error('Only support testnet.')
+  }
   let cmd = process.argv[2]
 
   if (fs.existsSync('pending-txs.json')) {
@@ -144,16 +144,10 @@ function walletNew () {
 }
 
 async function walletSync () {
-  // if (process.env.TESTNET == 'true') throw new Error('no testnet api')
-
   let wallet = JSON.parse(fs.readFileSync(WALLET_PATH))
-
   console.log('syncing utxos with dogelayer.org api')
 
-  // let response = await axios.get(`https://dogechain.info/api/v1/address/unspent/${wallet.address}`)
-  let response = await axios.get(
-    `https://dogetest-explorer.dogelayer.org/api/v2/utxo/${wallet.address}`
-  )
+  let response = await axios.get(API_URL + 'utxo/' + wallet.address)
   wallet.utxos = response.data.map(output => {
     return {
       txid: output.txid,
@@ -164,17 +158,13 @@ async function walletSync () {
   })
 
   fs.writeFileSync(WALLET_PATH, JSON.stringify(wallet, 0, 2))
-
   let balance = wallet.utxos.reduce((acc, curr) => acc + curr.satoshis, 0)
-
   console.log('balance', balance)
 }
 
 function walletBalance () {
   let wallet = JSON.parse(fs.readFileSync(WALLET_PATH))
-
   let balance = wallet.utxos.reduce((acc, curr) => acc + curr.satoshis, 0)
-
   console.log(wallet.address, balance)
 }
 
@@ -201,8 +191,7 @@ async function walletSend () {
   }
 
   await broadcast(tx, true)
-
-  console.log("tx hash: ",tx.hash)
+  console.log('tx hash: ', tx.hash)
 }
 
 async function walletSplit () {
@@ -225,8 +214,6 @@ async function walletSplit () {
 
   console.log(tx.hash)
 }
-
-const MAX_SCRIPT_ELEMENT_SIZE = 520
 
 async function mint (paramAddress, paramContentTypeOrFilename, paramHexData) {
   const argAddress = paramAddress || process.argv[3]
@@ -477,8 +464,6 @@ function fund (wallet, tx) {
     }
 
     delete tx._fee
-    console.log('fund')
-    console.log(utxo)
     tx.from(utxo)
 
     tx.change(wallet.address)
@@ -515,8 +500,7 @@ function updateWallet (wallet, tx) {
   })
 }
 
-async function broadcast_dogelayer_api(tx) {
-  
+async function broadcast_dogelayer_api (tx) {
   try {
     const response = await axios.post(API_URL + 'sendtx/', tx.toString())
     console.log(response.data)
@@ -530,8 +514,8 @@ async function broadcast_dogelayer_api(tx) {
   fs.writeFileSync(WALLET_PATH, JSON.stringify(wallet, 0, 2))
 }
 
-async function broadcast(tx,retry=0) {
-    return broadcast_dogelayer_api(tx)
+async function broadcast (tx, retry = 0) {
+  return broadcast_dogelayer_api(tx)
 }
 
 function chunkToNumber (chunk) {
@@ -542,12 +526,27 @@ function chunkToNumber (chunk) {
   return undefined
 }
 
+async function getAddressTxs(address) {
+    let {data} = await axios.get(API_URL + "/address/" + address + "?details=txs")
+    txs = data.transactions
+    return txs
+}
+
+function findSpendTx(txs,txid,n) {
+    for (tx of txs) {
+        for(vin of tx.vin) {
+            if(vin.txid == txid && vin.n == n) {
+                return tx.txid
+            }
+        }
+    }
+    return null
+}
+
 async function extract (txid) {
-  let resp = await axios.get(
-    `https://dogechain.info/api/v1/transaction/${txid}`
-  )
-  let transaction = resp.data.transaction
-  let script = Script.fromHex(transaction.inputs[0].scriptSig.hex)
+  let resp = await axios.get(API_URL + 'tx/' + txid)
+  let transaction = resp.data
+  let script = Script.fromHex(transaction.vin[0].hex)
   let chunks = script.chunks
 
   let prefix = chunks.shift().buf.toString('utf-8')
@@ -562,16 +561,17 @@ async function extract (txid) {
   let data = Buffer.alloc(0)
   let remaining = pieces
 
+  // TODO: optimise finding all tx in series
   while (remaining && chunks.length) {
     let n = chunkToNumber(chunks.shift())
 
     if (n !== remaining - 1) {
-      txid = transaction.outputs[0].spent.hash
-      resp = await axios.get(
-        `https://dogechain.info/api/v1/transaction/${txid}`
-      )
-      transaction = resp.data.transaction
-      script = Script.fromHex(transaction.inputs[0].scriptSig.hex)
+      const txs = await getAddressTxs(transaction.vout[0].addresses[0])
+      txid = findSpendTx(txs,transaction.txid,0)
+      console.log("next tx: ", txid)
+      resp = await axios.get(API_URL + 'tx/' + txid)
+      transaction = resp.data
+      script = Script.fromHex(transaction.vin[0].hex)
       chunks = script.chunks
       continue
     }
@@ -606,7 +606,7 @@ function server () {
     console.log()
     console.log(`Example:`)
     console.log(
-      `http://localhost:${port}/tx/15f3b73df7e5c072becb1d84191843ba080734805addfccb650929719080f62e`
+      `http://localhost:${port}/tx/b201783a8e5c8f98f40b250c28f666d16db105ae663efa70132a9eddc6f2e804`
     )
   })
 }

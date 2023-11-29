@@ -6,3 +6,4 @@ node_modules
 /*.ipr
 /*.iws
 .DS_Store
+testdata
