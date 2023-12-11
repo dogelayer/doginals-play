@@ -456,6 +456,10 @@ function fund (wallet, tx) {
   delete tx._fee
 
   for (const utxo of wallet.utxos) {
+    // console.log("get fee:",tx.getFee())
+    if (utxo.satoshis <= 1000000) {
+      continue
+    }
     if (
       tx.inputs.length &&
       tx.outputs.length &&
