@@ -1,0 +1,17 @@
+syntax = "proto3";
+package drc;
+option go_package = "drc/drc";
+
+message drc {
+    uint32 p = 1;
+}
+
+message drc20 {
+    uint32 p = 1;
+    uint32 op = 2;
+    string tick = 3;
+    uint64 max = 4;
+    uint64 lim = 5;
+    uint64 amt = 6;
+}
+

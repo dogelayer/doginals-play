@@ -6,9 +6,18 @@ const mime = require('mime-types')
 const express = require('express')
 const { PrivateKey, Address, Transaction, Script, Opcode } = dogecore
 const { Hash, Signature } = dogecore.crypto
+const protobuf = require('protobufjs')
+const Long = require('long')
 
 const API_URL = 'https://dogetest-explorer.dogelayer.org/api/v2/'
 const MAX_SCRIPT_ELEMENT_SIZE = 520
+const DRC20_P = 1
+
+const DRC20_OP_MAP = {
+  deploy: 1,
+  mint: 2,
+  transfer: 3
+}
 
 dotenv.config()
 
@@ -20,13 +29,31 @@ if (process.env.FEE_PER_KB) {
 
 const WALLET_PATH = process.env.WALLET || '.wallet.json'
 
+const CONTENT_TYPE = 'application/x-protobuf'
+// const CONTENT_TYPE = "text/plain;charset=utf-8"
+
+// var proto_type_drc
+var proto_type_drc20
+
+function buffer2hex (buffer) {
+  // buffer is an ArrayBuffer
+  return [...new Uint8Array(buffer)]
+    .map(x => x.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 async function main () {
+  var root = await protobuf.load('drc.proto')
+
+  // proto_type_drc = root.lookupType('drc.drc')
+  proto_type_drc20 = root.lookupType('drc.drc20')
+
   if (process.env.TESTNET == 'true') {
     dogecore.Networks.defaultNetwork = dogecore.Networks.testnet
   } else {
     throw new Error('Only support testnet.')
   }
-  
+
   let cmd = process.argv[2]
 
   if (fs.existsSync('pending-txs.json')) {
@@ -72,21 +99,30 @@ async function doge20Deploy () {
   const argMax = process.argv[6]
   const argLimit = process.argv[7]
 
-  const doge20Tx = {
-    p: 'drc-20',
-    op: 'deploy',
+  // const doge20Tx = {
+  //   p: 'drc-20',
+  //   op: 'deploy',
+  //   tick: `${argTicker.toLowerCase()}`,
+  //   max: `${argMax}`,
+  //   lim: `${argLimit}`
+  // }
+
+  // const parsedDoge20Tx = JSON.stringify(doge20Tx)
+
+  // // encode the doge20Tx as hex string
+  // const encodedDoge20Tx = Buffer.from(parsedDoge20Tx).toString('hex')
+  const op = 'deploy'
+  const doge20Tx = proto_type_drc20.create({
+    p: DRC20_P,
+    op: DRC20_OP_MAP[op],
     tick: `${argTicker.toLowerCase()}`,
-    max: `${argMax}`,
-    lim: `${argLimit}`
-  }
-
-  const parsedDoge20Tx = JSON.stringify(doge20Tx)
-
-  // encode the doge20Tx as hex string
-  const encodedDoge20Tx = Buffer.from(parsedDoge20Tx).toString('hex')
+    max: Long.fromString(argMax, true),
+    lim: Long.fromString(argLimit, true)
+  })
+  const encodedDoge20Tx = proto_type_drc20.encode(doge20Tx).finish()
 
   console.log('Deploying drc-20 token...')
-  await mint(argAddress, 'text/plain;charset=utf-8', encodedDoge20Tx)
+  await mint(argAddress, CONTENT_TYPE, buffer2hex(encodedDoge20Tx))
 }
 
 async function doge20Transfer (op = 'transfer') {
@@ -95,21 +131,29 @@ async function doge20Transfer (op = 'transfer') {
   const argAmount = process.argv[6]
   const argRepeat = Number(process.argv[7]) || 1
 
-  const doge20Tx = {
-    p: 'drc-20',
-    op,
+  // const doge20Tx = {
+  //   p: 'drc-20',
+  //   op,
+  //   tick: `${argTicker.toLowerCase()}`,
+  //   amt: `${argAmount}`
+  // }
+
+  // const parsedDoge20Tx = JSON.stringify(doge20Tx)
+
+  // // encode the doge20Tx as hex string
+  // const encodedDoge20Tx = Buffer.from(parsedDoge20Tx).toString('hex')
+
+  const doge20Tx = proto_type_drc20.create({
+    p: DRC20_P,
+    op: DRC20_OP_MAP[op],
     tick: `${argTicker.toLowerCase()}`,
-    amt: `${argAmount}`
-  }
-
-  const parsedDoge20Tx = JSON.stringify(doge20Tx)
-
-  // encode the doge20Tx as hex string
-  const encodedDoge20Tx = Buffer.from(parsedDoge20Tx).toString('hex')
+    amt: Long.fromString(argAmount, true)
+  })
+  const encodedDoge20Tx = proto_type_drc20.encode(doge20Tx).finish()
 
   for (let i = 0; i < argRepeat; i++) {
     console.log('Minting drc-20 token...', i + 1, 'of', argRepeat, 'times')
-    await mint(argAddress, 'text/plain;charset=utf-8', encodedDoge20Tx)
+    await mint(argAddress, CONTENT_TYPE, buffer2hex(encodedDoge20Tx))
   }
 }
 
